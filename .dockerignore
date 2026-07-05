@@ -1,0 +1,17 @@
+# Loai khoi build context (giu bin/ va data/build/ts-data)
+.git
+.venv
+venv
+__pycache__
+*.pyc
+*.log
+.env
+typesense-data/
+typesense.pid
+docs/
+scripts/mcp_client_test.py
+# Du lieu tho + file embedded lon (KHONG can trong image, index da o ts-data)
+data/*.json
+data/*.jsonl
+data/build/embedded.jsonl
+data/build/done.txt

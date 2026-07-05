@@ -1,0 +1,21 @@
+.env
+typesense-data/
+typesense.pid
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.log
+
+# Binary Typesense (414MB - tai lai tu dl.typesense.org, xem README)
+bin/
+
+# Du lieu lon + noi dung ban quyen (thuvienphapluat) + output build - KHONG commit
+data/
+
+# Scripts debug session (chua API key / dac thu phien lam viec)
+scripts/probe_proxy.py
+scripts/probe_run.sh
+scripts/test_batch.py
+scripts/test_qgen.py
+scripts/test_qgen2.py
