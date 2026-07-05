@@ -60,6 +60,21 @@ class Typesense:
         results = [json.loads(l) for l in text.splitlines() if l.strip()]
         return results
 
+    def get_document(self, name, doc_id):
+        return self.get_json(f"/collections/{name}/documents/{doc_id}")
+
+    def update_by_filter(self, name, filter_by, fields):
+        """Update-by-query: cap nhat cac field cho moi doc khop filter. Tra {num_updated}."""
+        from urllib.parse import urlencode
+        qs = urlencode({"filter_by": filter_by})
+        return json.loads(self._req("PATCH", f"/collections/{name}/documents?{qs}", body=fields))
+
+    def delete_by_filter(self, name, filter_by):
+        """Delete-by-query: xoa moi doc khop filter. Tra {num_deleted}."""
+        from urllib.parse import urlencode
+        qs = urlencode({"filter_by": filter_by})
+        return json.loads(self._req("DELETE", f"/collections/{name}/documents?{qs}"))
+
     def search(self, name, params):
         from urllib.parse import urlencode
         qs = urlencode(params)
