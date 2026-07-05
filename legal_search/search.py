@@ -13,9 +13,19 @@ from .proxy import embed, rerank as proxy_rerank
 from .typesense_api import Typesense
 from .chunking import fold_ascii
 
-QUERY_BY = "heading_ascii,body_ascii"     # keyword tren truong khong dau
-QUERY_BY_WEIGHTS = "3,1"
+import re
+
+QUERY_BY = "citation,heading_ascii,body_ascii"  # citation de khop truy van theo so hieu VB (vd "141/2026/ND-CP")
+QUERY_BY_WEIGHTS = "5,3,1"
 RERANK_INPUT_CHARS = 1500
+
+# Truy van dang tra cuu so hieu VB (vd "141/2026/ND-CP", "Nghi dinh 68/2026") -> keyword-first,
+# vi vector kem voi ma so, va rank-fusion RRF se dim hit keyword xuong duoi pool rerank.
+DOC_CODE_RE = re.compile(r"\d{1,4}\s*/\s*\d{4}\s*/\s*[A-Za-z]", re.I)
+
+
+def is_doc_code_query(question):
+    return bool(DOC_CODE_RE.search(fold_ascii(question)))
 
 
 def _vector_query(vec, k, alpha):
@@ -29,6 +39,12 @@ def _rerank_text(doc):
 
 def search(cfg, ts, question, mode="hybrid", k=5, alpha=0.7, candidates=100,
            effective_only=True, exclude_low_value=True, rerank=False, rerank_pool=30):
+    # Truy van theo so hieu VB -> keyword-first (chinh xac hon vector cho ma so).
+    # Tat luon rerank: cross-encoder khong hieu "day chinh la VB duoc hoi",
+    # trong khi text_match tren citation da la thu hang dung.
+    if mode == "hybrid" and is_doc_code_query(question):
+        mode = "keyword"
+        rerank = False
     filters = []
     if exclude_low_value:
         filters.append("is_low_value:false")
