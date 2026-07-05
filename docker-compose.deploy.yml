@@ -1,0 +1,36 @@
+# Trien khai server: legal-mcp (Typesense + MCP) + Dashboard quan tri.
+# Dung: EMBED_API_KEY=sk-xxx TYPESENSE_API_KEY=key-manh docker compose -f docker-compose.deploy.yml up -d
+version: "3.8"
+
+services:
+  legal-mcp:
+    image: ghcr.io/dinhxuantuyen/legal-mcp:slim
+    container_name: legal-mcp
+    restart: unless-stopped
+    ports:
+      - "8000:8000"        # MCP endpoint cho AI Agent
+      - "8108:8108"        # Typesense API — CHI mo trong mang noi bo (cho dashboard/admin)
+    volumes:
+      - legal-data:/data
+      - ./import:/import   # dat embedded.jsonl vao ./import de import
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-poc_legal_search_2026}
+      EMBED_API_KEY: ${EMBED_API_KEY:?can truyen EMBED_API_KEY}
+      RERANK_ENABLE: "true"
+    mem_limit: 10g
+
+  dashboard:
+    image: bfritscher/typesense-dashboard:latest
+    container_name: typesense-dashboard
+    restart: unless-stopped
+    ports:
+      - "8888:80"          # GUI quan tri — chi nen mo trong mang noi bo/VPN
+    depends_on:
+      - legal-mcp
+
+volumes:
+  legal-data:
