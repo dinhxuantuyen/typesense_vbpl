@@ -63,6 +63,38 @@ python3 -m legal_search.eval --questions data/eval_questions.json --alpha 0.7
 Kết quả trên bộ mẫu: **hybrid α=0.7 đạt Recall@1 = 1.00, MRR = 1.0**. Xem
 [docs/ptyc/chien-luoc-embedding-search.md](docs/ptyc/chien-luoc-embedding-search.md) mục "Kết quả eval".
 
+## Cập nhật dữ liệu (CRUD) — TASK-014
+
+Khi văn bản thay đổi (thêm mới, sửa nội dung, sửa đổi/bãi bỏ hiệu lực):
+
+### CLI
+```bash
+# Them/sua dieu (re-embed, xu ly sub-chunk, thay the part cu)
+python3 -m legal_search.crud upsert --file dieu_moi.json
+# Doi hieu luc — KHONG re-embed (nhanh), theo law_id hoac chunk_id
+python3 -m legal_search.crud patch-status --law-id 12076 --status "Het hieu luc" --expiration 2026-01-01
+# Xoa 1 dieu / ca van ban
+python3 -m legal_search.crud delete --chunk-id 12076-dieu-25
+python3 -m legal_search.crud delete --law-id 12076
+# Xem 1 dieu
+python3 -m legal_search.crud get --chunk-id 12076-dieu-25
+```
+
+### REST admin API (Starlette, tách khỏi MCP tìm kiếm)
+```bash
+~/legal-venv/bin/python -m legal_search.admin_api    # cong ADMIN_PORT (mac dinh 8010)
+```
+| Method | Endpoint | Body / Ghi chú |
+|---|---|---|
+| POST | `/articles` | record hoặc `[record]` — upsert (re-embed) |
+| PATCH | `/articles/status` | `{law_id\|chunk_id, validity_status?, effective_date?, expiration_date?}` — không re-embed |
+| GET | `/articles/{chunk_id}` | lấy 1 điều (ghép part) |
+| DELETE | `/articles/{chunk_id}` | xóa 1 điều |
+| DELETE | `/laws/{law_id}` | xóa cả văn bản |
+| GET | `/health` | |
+
+> Đặt biến `ADMIN_TOKEN` để bật auth `Authorization: Bearer <token>` cho các thao tác ghi.
+
 ---
 
 # Sản phẩm hóa: Docker all-in-one + MCP server

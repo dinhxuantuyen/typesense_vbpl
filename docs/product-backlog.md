@@ -36,3 +36,4 @@
 | TASK-012 | Tạo bộ benchmark 1000 mẫu | B1 chọn mẫu 1000 (offline) → seed.jsonl: XONG. B2 sinh câu hỏi bằng LLM **DeepSeek-V4-Flash** (gen_benchmark.py) chờ chạy sau khi embed xong (proxy rảnh). | In Progress | 2026-07-04 |
 | TASK-011 | Kiểm thử E2E + eval dữ liệu thật | Đo Recall/MRR trên dữ liệu thật (dùng benchmark TASK-012), A/B chiều vector & α, tối ưu | Todo | 2026-07-04 |
 | TASK-013 | Dựng Typesense Dashboard (GUI quản trị) | Container `bfritscher/typesense-dashboard` chạy port 8888 (HTTP 200), kết nối server 8108. Xem/sửa/xóa document, chạy search. Sẽ đóng gói vào image sau. | Done | 2026-07-05 |
+| TASK-014 | API CRUD cập nhật dữ liệu | Module + CLI + REST admin (Starlette): upsert (re-embed, xử lý sub-chunk), patch hiệu lực (không re-embed), delete theo chunk_id/law_id, get. Đã test round-trip CLI + HTTP OK. | Done | 2026-07-05 |
