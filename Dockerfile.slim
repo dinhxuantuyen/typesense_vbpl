@@ -1,33 +1,26 @@
-# All-in-one image: Typesense (index baked) + MCP server tra cuu phap luat.
-# LUU Y: build can DNS docker hoat dong (pull base + apt + pip). Xem README muc "DNS".
+# Image SERVICES-ONLY: Typesense + MCP server, KHONG kem du lieu.
+# Du lieu import sau khi deploy (xem DEPLOY.md), luu trong volume /data.
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
-# Lib runtime toi thieu: curl (healthcheck/entrypoint), ca-certificates (HTTPS goi proxy)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Python deps (MCP SDK, uvicorn)
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Typesense binary
 COPY bin/typesense-server /usr/local/bin/typesense-server
 RUN chmod +x /usr/local/bin/typesense-server
 
-# Ma nguon + entrypoint
 COPY legal_search/ /app/legal_search/
 COPY docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh && mkdir -p /data
 
-# Index da build san (rocksdb data dir) — bake vao image
-COPY data/build/ts-data/ /data/
-
-# Cau hinh mac dinh (KHONG chua secret). EMBED_API_KEY phai truyen luc `docker run -e ...`.
+# Cau hinh mac dinh (KHONG chua secret). EMBED_API_KEY truyen luc `docker run -e ...`.
 ENV TYPESENSE_HOST=localhost \
     TYPESENSE_PORT=8108 \
     TYPESENSE_COLLECTION=legal_articles \
@@ -43,11 +36,11 @@ ENV TYPESENSE_HOST=localhost \
     MCP_HOST=0.0.0.0 \
     MCP_PORT=8000
 
+VOLUME /data
 EXPOSE 8000
 
-# CHI check MCP (port 8000): MCP chi khoi dong SAU khi Typesense load xong,
-# nen MCP up <=> he thong san sang. KHONG curl Typesense trong healthcheck vi
-# request HTTP den Typesense 29 dang load snapshot co the gay segfault.
+# Chi check MCP: MCP chi len SAU khi Typesense san sang -> MCP up <=> he thong ready.
+# KHONG curl Typesense trong luc load (Typesense 29 co the segfault khi nhan request luc load).
 HEALTHCHECK --interval=15s --timeout=5s --start-period=600s --retries=5 \
   CMD curl -s http://localhost:8000/mcp >/dev/null || exit 1
 
