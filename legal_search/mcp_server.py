@@ -9,6 +9,7 @@ Chay (WSL):
   ~/legal-venv/bin/python -m legal_search.mcp_server
 """
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .config import Config
 from .search import search
@@ -17,7 +18,16 @@ from .typesense_api import Typesense
 cfg = Config()
 ts = Typesense(cfg.ts_base, cfg.ts_api_key)
 
-mcp = FastMCP("legal-search", host=cfg.mcp_host, port=cfg.mcp_port)
+mcp = FastMCP(
+    "legal-search",
+    host=cfg.mcp_host,          # mac dinh 0.0.0.0 (env MCP_HOST)
+    port=cfg.mcp_port,
+    # Cho phep Agent goi bang IP/domain (khong chi localhost) — tat DNS-rebinding check.
+    # Chi expose port MCP trong mang tin cay/noi bo.
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ),
+)
 
 
 def _to_result(hit: dict) -> dict:
