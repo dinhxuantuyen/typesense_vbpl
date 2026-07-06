@@ -25,9 +25,10 @@ def _post(url: str, api_key: str, payload: dict, timeout: int = 120) -> dict:
         return json.load(resp)
 
 
-# Instruction cho phia QUERY (bat doi xung — dac thu Qwen3-Embedding).
+# Instruction cho phia QUERY (bat doi xung — document embed KHONG co instruction,
+# nen doi instruction nay khong can re-embed du lieu).
 QUERY_INSTRUCTION = (
-    "Instruct: Cho mot cau hoi phap ly tieng Viet, tim cac dieu luat lien quan nhat.\nQuery: "
+    "Intruction: Hãy truy xuất điều luật trả lời cho câu hỏi hoặc mệnh đề sau: \n Query: "
 )
 
 
