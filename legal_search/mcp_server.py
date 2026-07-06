@@ -52,17 +52,20 @@ def _to_result(hit: dict) -> dict:
 @mcp.tool()
 def search_legal_articles(
     query: str,
-    top_k: int = 5,
+    top_k: int = 10,
     document_type: str = "",
     effective_only: bool = True,
+    use_rerank: bool = True,
 ) -> list[dict]:
     """Tim cac Dieu luat lien quan nhat toi cau hoi ngon ngu tu nhien (tieng Viet).
 
     Dung cho: hoi dap phap luat, tra cuu quy dinh, tim can cu phap ly.
     - query: cau hoi hoac tu khoa (co dau hoac khong dau deu duoc).
-    - top_k: so Dieu tra ve (mac dinh 5).
+    - top_k: so Dieu tra ve (mac dinh 10 — khuyen nghi giu 10 de dat recall tot nhat).
     - document_type: loc theo loai VB (vd 'Luat', 'Nghi dinh', 'Thong tu'); de trong = tat ca.
     - effective_only: chi tra Dieu thuoc VB con hieu luc (mac dinh True).
+    - use_rerank: True (mac dinh) = chinh xac hon (+0.5-1s); False = nhanh hon, giam do chinh xac.
+      (Chi co tac dung khi server bat RERANK_ENABLE.)
 
     Tra ve list Dieu, moi Dieu co: citation, article_heading, document_code/type,
     validity_status, snippet noi dung, source_url (de tra nguoc van ban goc), score.
@@ -72,7 +75,7 @@ def search_legal_articles(
         results = search(
             cfg, ts, query, mode="hybrid", k=max(1, min(top_k, 20)),
             alpha=cfg.search_alpha, effective_only=effective_only,
-            rerank=cfg.rerank_enable,
+            rerank=cfg.rerank_enable and use_rerank,
         )
     except Exception as e:  # noqa: BLE001
         return [{"error": f"Loi tim kiem: {e}"}]
