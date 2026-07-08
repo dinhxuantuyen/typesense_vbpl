@@ -50,12 +50,13 @@ def rank_of(results, expected):
     return 0
 
 
-def evaluate(cfg, ts, items, mode_name, k, alpha, workers):
+def evaluate(cfg, ts, items, mode_name, k, alpha, workers, candidates, levels):
     smode, rerank = MODES[mode_name]
 
     def one(it):
         try:
-            res = search(cfg, ts, it["q"], mode=smode, k=k, alpha=alpha, rerank=rerank)
+            res = search(cfg, ts, it["q"], mode=smode, k=k, alpha=alpha,
+                         candidates=candidates, rerank=rerank, rerank_pool=k)
             return rank_of(res, it["expected"])
         except Exception:
             return 0
@@ -64,14 +65,12 @@ def evaluate(cfg, ts, items, mode_name, k, alpha, workers):
         ranks = list(ex.map(one, items))
 
     n = len(ranks)
-    return {
-        "mode": mode_name,
-        "R@1": sum(1 for r in ranks if r == 1) / n,
-        "R@5": sum(1 for r in ranks if 1 <= r <= 5) / n,
-        "R@10": sum(1 for r in ranks if 1 <= r <= 10) / n,
-        "MRR": sum((1.0 / r) for r in ranks if r > 0) / n,
-        "miss": sum(1 for r in ranks if r == 0),
-    }
+    row = {"mode": mode_name}
+    for L in levels:
+        row[f"R@{L}"] = sum(1 for r in ranks if 1 <= r <= L) / n
+    row["MRR"] = sum((1.0 / r) for r in ranks if r > 0) / n
+    row["miss"] = sum(1 for r in ranks if r == 0)
+    return row
 
 
 def main():
@@ -80,6 +79,7 @@ def main():
     ap.add_argument("--k", type=int, default=10)
     ap.add_argument("--alpha", type=float, default=0.7)
     ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--candidates", type=int, default=0, help="0=auto (max(100, k*3))")
     ap.add_argument("--modes", default="keyword,vector,hybrid,rerank")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
@@ -87,16 +87,20 @@ def main():
     cfg = Config()
     ts = Typesense(cfg.ts_base, cfg.ts_api_key)
     items = load_items(args.questions)
-    print(f"Benchmark: {len(items)} cau | k={args.k} | alpha={args.alpha} | workers={args.workers}\n")
+    candidates = args.candidates or min(250, max(100, args.k * 3))  # Typesense per_page toi da 250
+    levels = sorted({1, 5, 10, args.k})
+    print(f"Benchmark: {len(items)} cau | k={args.k} | candidates={candidates} | alpha={args.alpha} | workers={args.workers}\n", flush=True)
 
-    print(f"{'Mode':<10} {'R@1':>7} {'R@5':>7} {'R@10':>7} {'MRR':>7} {'miss':>6}")
-    print("-" * 50)
+    hdr = f"{'Mode':<10}" + "".join(f"{'R@'+str(L):>8}" for L in levels) + f"{'MRR':>8}{'miss':>6}"
+    print(hdr); print("-" * len(hdr), flush=True)
     for mode in args.modes.split(","):
         mode = mode.strip()
         if mode not in MODES:
             continue
-        r = evaluate(cfg, ts, items, mode, args.k, args.alpha, args.workers)
-        print(f"{r['mode']:<10} {r['R@1']:>7.3f} {r['R@5']:>7.3f} {r['R@10']:>7.3f} {r['MRR']:>7.3f} {r['miss']:>6}")
+        r = evaluate(cfg, ts, items, mode, args.k, args.alpha, args.workers, candidates, levels)
+        line = f"{r['mode']:<10}" + "".join(f"{r['R@'+str(L)]:>8.3f}" for L in levels)
+        line += f"{r['MRR']:>8.3f}{r['miss']:>6}"
+        print(line, flush=True)
 
 
 if __name__ == "__main__":

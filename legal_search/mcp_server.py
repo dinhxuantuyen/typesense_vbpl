@@ -72,10 +72,12 @@ def search_legal_articles(
     LUU Y: khi tra loi nguoi dung PHAI trich dan citation + source_url.
     """
     try:
+        k = max(1, min(top_k, 100))
         results = search(
-            cfg, ts, query, mode="hybrid", k=max(1, min(top_k, 20)),
+            cfg, ts, query, mode="hybrid", k=k,
             alpha=cfg.search_alpha, effective_only=effective_only,
-            rerank=cfg.rerank_enable and use_rerank,
+            candidates=min(250, max(100, k * 3)),
+            rerank=cfg.rerank_enable and use_rerank, rerank_pool=max(30, k),
         )
     except Exception as e:  # noqa: BLE001
         return [{"error": f"Loi tim kiem: {e}"}]
