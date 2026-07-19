@@ -1,0 +1,368 @@
+openapi: 3.0.3
+info:
+  title: Legal Search API — Tra cứu văn bản pháp luật (main-stream Nghị định)
+  version: "1.0.0"
+  description: |
+    API tra cứu điều luật (semantic + keyword hybrid, có rerank) trên corpus main-stream
+    (Nghị định còn hiệu lực + văn bản liên quan qua quan hệ hướng dẫn/được hướng dẫn/hợp nhất),
+    kèm CRUD cập nhật dữ liệu và tra cứu quan hệ giữa các văn bản.
+
+    **Kiến trúc hiện tại:**
+    - Tìm kiếm phục vụ AI Agent qua **MCP (streamable HTTP)** tại `/mcp` (tool `search_legal_articles`,
+      `get_legal_article`, `collection_stats`, `get_related_documents`). Đặc tả REST dưới đây là hợp đồng
+      tương đương cho REST gateway.
+    - CRUD/admin phục vụ qua **REST** (Starlette) — đã triển khai trong `legal_search/admin_api.py`.
+
+    **Embedding:** Qwen3-Embedding-8B (4096 chiều). **Rerank:** Qwen3-Reranker-4B.
+    **Đơn vị dữ liệu:** 1 bản ghi = 1 Điều (điều dài tách nhiều part, khi trả về gộp `full_content`).
+  contact: { name: "Legal Search", url: "https://github.com/dinhxuantuyen/typesense_vbpl" }
+
+servers:
+  - url: http://localhost:8010
+    description: Admin REST API (CRUD)
+  - url: http://localhost:8000
+    description: MCP endpoint (streamable HTTP) — /mcp
+
+tags:
+  - name: Search
+    description: Tra cứu điều luật (semantic + keyword hybrid)
+  - name: Article
+    description: Lấy điều / quan hệ
+  - name: Admin
+    description: CRUD cập nhật dữ liệu (yêu cầu Bearer token nếu bật ADMIN_TOKEN)
+  - name: System
+
+paths:
+  /v1/search:
+    post:
+      tags: [Search]
+      summary: Tìm điều luật liên quan tới câu hỏi
+      description: |
+        Hybrid (keyword không dấu + vector 4096) → rollup theo Điều (parent_id) → rerank →
+        trả top_k Điều kèm `full_content` (đã gộp part), quan hệ, và điểm số.
+        Truy vấn số hiệu VB NGẮN (≤8 từ) tự chuyển sang keyword-first trên `document_code`.
+      operationId: searchLegalArticles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SearchRequest" }
+            examples:
+              faq:
+                value:
+                  query: "Mức đóng thuế hộ kinh doanh năm 2026"
+                  top_k: 10
+                  effective_only: true
+                  use_rerank: true
+      responses:
+        "200":
+          description: Kết quả tìm kiếm
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /v1/articles/{id}:
+    get:
+      tags: [Article]
+      summary: Lấy toàn văn 1 Điều theo chunk id
+      description: Ghép các part (nếu điều bị tách) → trả `full_content` + metadata + quan hệ.
+      operationId: getLegalArticle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "id điều (parent), vd 685358-dieu-8"
+          schema: { type: string }
+      responses:
+        "200":
+          description: Điều đầy đủ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Article" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin]
+      summary: Xóa 1 Điều (mọi part)
+      operationId: deleteArticle
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Số document đã xóa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/articles/{law_id}/related:
+    get:
+      tags: [Article]
+      summary: Tra cứu quan hệ của 1 văn bản
+      description: |
+        Trả các văn bản liên quan theo quan hệ hướng dẫn / được hướng dẫn / hợp nhất.
+        Lọc theo `relation` (tùy chọn).
+      operationId: getRelatedDocuments
+      parameters:
+        - { name: law_id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - name: relation
+          in: query
+          required: false
+          description: Lọc theo loại quan hệ
+          schema:
+            type: string
+            enum: [huong_dan, duoc_huong_dan, hop_nhat]
+      responses:
+        "200":
+          description: Danh sách quan hệ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  law_id: { type: integer, format: int64 }
+                  related:
+                    type: array
+                    items: { $ref: "#/components/schemas/RelatedDoc" }
+
+  /v1/articles:
+    post:
+      tags: [Admin]
+      summary: Thêm/sửa Điều (upsert, tự re-embed)
+      description: Nhận 1 hoặc nhiều bản ghi VB nguồn; chunk + re-embed + thay thế part cũ.
+      operationId: upsertArticles
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/SourceRecord"
+                - type: array
+                  items: { $ref: "#/components/schemas/SourceRecord" }
+      responses:
+        "200":
+          description: Kết quả upsert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upserted_articles: { type: integer }
+                  documents: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/articles/status:
+    patch:
+      tags: [Admin]
+      summary: Cập nhật hiệu lực (KHÔNG re-embed)
+      description: Đổi validity_status/effective_date/expiration_date; tự tính lại is_effective_now. Theo law_id hoặc chunk_id.
+      operationId: patchStatus
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PatchStatusRequest" }
+      responses:
+        "200":
+          description: Số document cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { num_updated: { type: integer } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/laws/{law_id}:
+    delete:
+      tags: [Admin]
+      summary: Xóa cả văn bản (mọi điều theo law_id)
+      operationId: deleteLaw
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: law_id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        "200":
+          description: Số document đã xóa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/stats:
+    get:
+      tags: [System]
+      summary: Thông tin collection
+      operationId: collectionStats
+      responses:
+        "200":
+          description: Thống kê
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  collection: { type: string }
+                  num_documents: { type: integer }
+                  embed_model: { type: string }
+                  embed_dim: { type: integer }
+                  rerank_enabled: { type: boolean }
+
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      operationId: health
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { ok: { type: boolean } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "Đặt ENV ADMIN_TOKEN để bật; gửi header Authorization: Bearer <token>"
+
+  responses:
+    BadRequest:
+      description: Tham số không hợp lệ
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Thiếu/sai token
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: Không tìm thấy
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  schemas:
+    SearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string, description: "Câu hỏi ngôn ngữ tự nhiên (có/không dấu đều được)", example: "hộ kinh doanh doanh thu bao nhiêu thì phải nộp thuế" }
+        top_k: { type: integer, default: 10, minimum: 1, maximum: 100 }
+        document_type: { type: string, description: "Lọc theo loại VB (Nghị định/Luật/Thông tư...)", nullable: true }
+        effective_only: { type: boolean, default: true, description: "Chỉ trả VB còn hiệu lực" }
+        use_rerank: { type: boolean, default: true, description: "Bật tầng rerank cross-encoder" }
+
+    SearchResponse:
+      type: object
+      properties:
+        query: { type: string }
+        collection: { type: string, example: legal_mainstream }
+        model: { type: string, example: "Qwen/Qwen3-Embedding-8B" }
+        dim: { type: integer, example: 4096 }
+        count: { type: integer }
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/ArticleResult" }
+
+    ArticleResult:
+      type: object
+      description: 1 Điều khớp (đã rollup, gộp full_content)
+      properties:
+        rerank_score: { type: number, format: float, nullable: true, example: 0.9765 }
+        text_match: { type: integer, format: int64, description: "Điểm keyword (BM25)" }
+        vector_distance: { type: number, format: float, nullable: true, description: "Khoảng cách cosine (0=giống nhất)" }
+        id: { type: string, example: "685358-dieu-8#p1" }
+        parent_id: { type: string, example: "685358-dieu-8" }
+        part_no: { type: integer }
+        n_parts: { type: integer }
+        law_id: { type: integer, format: int64 }
+        citation: { type: string, example: "Điều 8 68/2026/NĐ-CP" }
+        article_no: { type: string, example: "8" }
+        article_heading: { type: string }
+        document_code: { type: string, example: "68/2026/NĐ-CP" }
+        document_type: { type: string, example: "Nghị định" }
+        document_title: { type: string }
+        validity_status: { type: string, example: "Còn hiệu lực" }
+        is_effective_now: { type: boolean }
+        chapter: { type: string, nullable: true }
+        context_path: { type: string, nullable: true }
+        fields: { type: array, items: { type: string } }
+        source_url: { type: string, format: uri }
+        full_content: { type: string, description: "Toàn văn Điều (đã gộp mọi part)" }
+        rel_guided_by_ids: { type: array, items: { type: integer, format: int64 }, description: "VB hướng dẫn điều/VB này" }
+        rel_guides_ids: { type: array, items: { type: integer, format: int64 }, description: "VB mà VB này hướng dẫn" }
+        rel_consolidated_ids: { type: array, items: { type: integer, format: int64 }, description: "VB hợp nhất (VBHN)" }
+        related:
+          type: array
+          items: { $ref: "#/components/schemas/RelatedDoc" }
+
+    RelatedDoc:
+      type: object
+      properties:
+        relation: { type: string, enum: [huong_dan, duoc_huong_dan, hop_nhat, duoc_hop_nhat] }
+        law_id: { type: integer, format: int64 }
+        document_code: { type: string }
+        document_type: { type: string }
+        name: { type: string }
+        validity_status: { type: string }
+        url: { type: string, format: uri }
+
+    Article:
+      type: object
+      description: Toàn văn 1 Điều (từ get)
+      properties:
+        chunk_id: { type: string }
+        citation: { type: string }
+        article_heading: { type: string }
+        document_code: { type: string }
+        document_type: { type: string }
+        document_title: { type: string }
+        validity_status: { type: string }
+        is_effective_now: { type: boolean }
+        context_path: { type: string, nullable: true }
+        content: { type: string, description: "Toàn văn (đã gộp part)" }
+        n_parts: { type: integer }
+        source_url: { type: string, format: uri }
+
+    SourceRecord:
+      type: object
+      description: Bản ghi VB nguồn (schema thuvienphapluat) để upsert
+      required: [chunk_id, content]
+      properties:
+        chunk_id: { type: string, example: "703882-dieu-4" }
+        law_id: { type: integer, format: int64 }
+        article_no: { type: string }
+        article_heading: { type: string }
+        citation: { type: string }
+        content: { type: string }
+        context: { type: object }
+        metadata:
+          type: object
+          properties:
+            document_code: { type: string }
+            document_type: { type: string }
+            title: { type: string }
+            effective_date: { type: string, example: "2026-03-05" }
+            expiration_date: { type: string, nullable: true }
+            validity_status: { type: string }
+            source_url: { type: string, format: uri }
+
+    PatchStatusRequest:
+      type: object
+      description: "Cung cấp law_id HOẶC chunk_id, cộng ít nhất 1 field cần đổi"
+      properties:
+        law_id: { type: integer, format: int64, nullable: true }
+        chunk_id: { type: string, nullable: true }
+        validity_status: { type: string, example: "Hết hiệu lực" }
+        effective_date: { type: string, nullable: true, example: "2026-01-01" }
+        expiration_date: { type: string, nullable: true, example: "2027-01-01" }
+
+    DeleteResult:
+      type: object
+      properties: { num_deleted: { type: integer } }
+
+    Error:
+      type: object
+      properties: { error: { type: string } }
