@@ -46,7 +46,7 @@
 | ID | Tên task | Mô tả | Trạng thái | Ngày tạo |
 |----|----------|-------|-----------|----------|
 | TASK-015 | Trích main-stream NĐ + đồ thị quan hệ (Phase 1) | XONG: 2.067 NĐ backbone + 4.094 edges (hướng dẫn/được hướng dẫn/hợp nhất, dedup 267 VBHN) + 4.371 văn bản main-stream (full nội dung). data/mainstream/. | Done | 2026-07-19 |
-| TASK-016 | Chunk + embed main-stream + search quan hệ (Phase 2) | Tách chunk (126.254 điều), embed 8B/4096d, index `legal_mainstream`, search API (rollup parent_id, gộp full điều, doc-code routing). MCP: sửa field cho collection mới + thêm tool `get_related_documents`. OpenAPI spec. | In Progress | 2026-07-19 |
+| TASK-016 | Chunk + embed main-stream + search quan hệ (Phase 2) | XONG: chunk 126.254 điều, embed 8B/4096d, index `legal_mainstream`, search API (rollup parent_id, gộp full điều, doc-code routing). MCP sửa field + tool `get_related_documents` (test OK). OpenAPI spec. FAQ Recall@20 doc 0.873 / điều 0.868 (71 câu). | Done | 2026-07-19 |
 
 ## Epic 4 — Đóng gói & triển khai main-stream lên production
 
@@ -55,4 +55,4 @@
 
 | ID | Tên task | Mô tả | Trạng thái | Ngày tạo |
 |----|----------|-------|-----------|----------|
-| TASK-017 | Đóng gói image slim main-stream + triển khai + clear corpus cũ | Build image slim mới (default `legal_mainstream`/8B/4096, MCP đã sửa), viết DEPLOY.md quy trình migrate từ bản production cũ (drop collection `legal_articles`), import `embedded_chunks.jsonl` (126k điều, 4096d), snapshot. | Analyzing | 2026-07-19 |
+| TASK-017 | Đóng gói image slim main-stream + triển khai + clear corpus cũ | XONG: build + push `ghcr.io/dinhxuantuyen/legal-mcp:mainstream` (1GB, smoke boot OK), DEPLOY.md 2 kịch bản (migrate production drop `legal_articles` / deploy mới), import `embedded_chunks.jsonl` (126k điều, 4096d), snapshot. compose tag mới. | Done | 2026-07-19 |
