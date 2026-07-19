@@ -2,17 +2,20 @@
 
 Tools:
   - search_legal_articles: tim cac Dieu luat lien quan tu cau hoi (hybrid + rerank), co trich dan.
-  - get_legal_article: lay toan van 1 Dieu theo chunk_id (ghep cac part neu bi sub-chunk).
+  - get_legal_article: lay toan van 1 Dieu theo article_id=parent_id (ghep cac part neu bi sub-chunk).
+  - get_related_documents: tra cac VB lien quan (huong dan / duoc huong dan / hop nhat) cua 1 VB.
   - collection_stats: thong tin collection.
 
 Chay (WSL):
   ~/legal-venv/bin/python -m legal_search.mcp_server
 """
+import json
+
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .config import Config
-from .search import search
+from .search import search, merge_full_article
 from .typesense_api import Typesense
 
 cfg = Config()
@@ -30,10 +33,31 @@ mcp = FastMCP(
 )
 
 
+def _parse_related(d: dict) -> list[dict]:
+    """Doc quan he tu related_json (string) -> list gon cho Agent."""
+    try:
+        rel = json.loads(d.get("related_json") or "[]")
+    except (ValueError, TypeError):
+        return []
+    out = []
+    for r in rel:
+        out.append({
+            "relation": r.get("relation"),        # huong_dan|duoc_huong_dan|hop_nhat|duoc_hop_nhat
+            "document_code": r.get("document_code"),
+            "document_type": r.get("document_type"),
+            "name": r.get("name"),
+            "validity_status": r.get("validity_status"),
+            "url": r.get("url"),
+        })
+    return out
+
+
 def _to_result(hit: dict) -> dict:
     d = hit["document"]
+    # snippet lay tu full_content (search da ghep) neu co, khong thi content
+    body = (d.get("full_content") or d.get("content") or "").replace("\n", " ")
     return {
-        "chunk_id": d.get("chunk_id"),
+        "id": d.get("parent_id") or d.get("id"),   # dung cho get_legal_article
         "citation": d.get("citation"),
         "article_no": d.get("article_no"),
         "article_heading": d.get("article_heading"),
@@ -41,9 +65,11 @@ def _to_result(hit: dict) -> dict:
         "document_code": d.get("document_code"),
         "document_type": d.get("document_type"),
         "validity_status": d.get("validity_status"),
+        "is_effective_now": d.get("is_effective_now"),
         "context_path": d.get("context_path"),
-        "snippet": (d.get("content") or "").replace("\n", " ")[:400],
+        "snippet": body[:400],
         "source_url": d.get("source_url"),
+        "related": _parse_related(d),
         "score": round(hit.get("rerank_score", 0.0), 4) if "rerank_score" in hit
                  else (round(1 - hit["vector_distance"], 4) if hit.get("vector_distance") is not None else None),
     }
@@ -90,39 +116,89 @@ def search_legal_articles(
 
 
 @mcp.tool()
-def get_legal_article(chunk_id: str) -> dict:
-    """Lay toan van 1 Dieu luat theo chunk_id (vd '12076-dieu-25').
+def get_legal_article(article_id: str) -> dict:
+    """Lay toan van 1 Dieu luat theo article_id (= truong 'id' tra ve tu search, vd '713724-dieu-25').
 
     Neu Dieu bi tach nhieu part (Dieu dai), ham se ghep lai theo thu tu.
-    Tra ve: toan van content + metadata (citation, VB, hieu luc, source_url).
+    Tra ve: toan van content + metadata (citation, VB, hieu luc, source_url) + quan he.
     """
     try:
         res = ts.search(cfg.collection, {
             "q": "*", "query_by": "body_ascii",
-            "filter_by": f"chunk_id:=`{chunk_id}`",
-            "per_page": 250, "exclude_fields": "embedding",
+            "filter_by": f"parent_id:=`{article_id}`",
+            "sort_by": "part_no:asc", "per_page": 250, "exclude_fields": "embedding",
         })
     except Exception as e:  # noqa: BLE001
         return {"error": f"Loi truy van: {e}"}
 
     hits = res.get("hits", [])
     if not hits:
-        return {"error": f"Khong tim thay chunk_id={chunk_id}"}
+        return {"error": f"Khong tim thay article_id={article_id}"}
     docs = sorted((h["document"] for h in hits), key=lambda d: d.get("part_no", 0))
     full = "\n".join(d.get("content", "") for d in docs)
     m = docs[0]
     return {
-        "chunk_id": chunk_id,
+        "id": article_id,
+        "law_id": m.get("law_id"),
         "citation": m.get("citation"),
+        "article_no": m.get("article_no"),
         "article_heading": m.get("article_heading"),
         "document_title": m.get("document_title"),
         "document_code": m.get("document_code"),
         "document_type": m.get("document_type"),
         "validity_status": m.get("validity_status"),
+        "is_effective_now": m.get("is_effective_now"),
         "context_path": m.get("context_path"),
         "content": full,
         "n_parts": m.get("n_parts", 1),
         "source_url": m.get("source_url"),
+        "related": _parse_related(m),
+    }
+
+
+@mcp.tool()
+def get_related_documents(law_id: int, relation: str = "") -> dict:
+    """Tra cac Van ban lien quan toi 1 VB (theo law_id) qua quan he trong main-stream.
+
+    Dung cho: tra do thi quan he — VB nao huong dan/duoc huong dan/hop nhat voi VB nay.
+    - law_id: ma so noi bo cua VB (truong 'law_id' trong ket qua search).
+    - relation: loc theo loai quan he; de trong = tat ca.
+      Gia tri: 'huong_dan' (VB nay huong dan VB khac), 'duoc_huong_dan' (VB khac huong dan VB nay),
+      'hop_nhat' / 'duoc_hop_nhat'.
+
+    Tra ve: list VB lien quan (document_code, document_type, name, validity_status, url), da dedup.
+    """
+    try:
+        res = ts.search(cfg.collection, {
+            "q": "*", "query_by": "body_ascii",
+            "filter_by": f"law_id:={int(law_id)}",
+            "per_page": 250,
+            "include_fields": "law_id,document_code,document_title,related_json",
+        })
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"Loi truy van: {e}"}
+
+    hits = res.get("hits", [])
+    if not hits:
+        return {"error": f"Khong tim thay VB law_id={law_id}"}
+    src = hits[0]["document"]
+    rel_want = relation.strip()
+    seen, related = set(), []
+    for h in hits:                                    # gom quan he qua tat ca chunk cua VB roi dedup
+        for r in _parse_related(h["document"]):
+            if rel_want and r.get("relation") != rel_want:
+                continue
+            key = (r.get("relation"), r.get("document_code"))
+            if key in seen:
+                continue
+            seen.add(key)
+            related.append(r)
+    return {
+        "law_id": int(law_id),
+        "document_code": src.get("document_code"),
+        "document_title": src.get("document_title"),
+        "count": len(related),
+        "related": related,
     }
 
 

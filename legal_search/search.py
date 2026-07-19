@@ -61,7 +61,7 @@ def search(cfg, ts, question, mode="hybrid", k=5, alpha=0.7, candidates=100,
         "query_by": query_by,
         "query_by_weights": weights,
         "per_page": candidates,
-        "exclude_fields": "embedding,body_ascii,heading_ascii,related_json",  # bo truong nang
+        "exclude_fields": "embedding,body_ascii,heading_ascii",  # bo truong nang (giu related_json cho quan he)
     }
     if filter_by:
         s["filter_by"] = filter_by
