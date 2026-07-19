@@ -45,5 +45,5 @@
 
 | ID | Tên task | Mô tả | Trạng thái | Ngày tạo |
 |----|----------|-------|-----------|----------|
-| TASK-015 | Trích main-stream NĐ + đồ thị quan hệ (Phase 1) | Lọc NĐ hiệu lực (gồm tương lai) → backbone; trích quan hệ hướng dẫn/được hướng dẫn/hợp nhất(2 chiều, dedup VBHN mới); xuất nodes + edges + tập văn bản main-stream (giữ nội dung cho phase sau) | In Progress | 2026-07-19 |
+| TASK-015 | Trích main-stream NĐ + đồ thị quan hệ (Phase 1) | XONG: 2.067 NĐ backbone + 4.094 edges (hướng dẫn/được hướng dẫn/hợp nhất, dedup 267 VBHN) + 4.371 văn bản main-stream (full nội dung). data/mainstream/. | Done | 2026-07-19 |
 | TASK-016 | Chunk + embed main-stream + search quan hệ (Phase 2) | Tách chunk các VB main-stream, embed, index Typesense; MCP tool tra quan hệ (get_related_documents) | Todo | 2026-07-19 |
