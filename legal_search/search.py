@@ -25,7 +25,10 @@ DOC_CODE_RE = re.compile(r"\d{1,4}\s*/\s*\d{4}\s*/\s*[A-Za-z]", re.I)
 
 
 def is_doc_code_query(question):
-    return bool(DOC_CODE_RE.search(fold_ascii(question)))
+    # Chi coi la truy van tra cuu so hieu VB khi cau NGAN (vd "Nghi dinh 68/2026/ND-CP").
+    # Cau hoi FAQ dai co nhac ma so trong noi dung -> van dung hybrid (semantic).
+    q = fold_ascii(question)
+    return bool(DOC_CODE_RE.search(q)) and len(q.split()) <= 8
 
 
 def _vector_query(vec, k, alpha):

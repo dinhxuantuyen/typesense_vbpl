@@ -19,3 +19,7 @@ scripts/probe_run.sh
 scripts/test_batch.py
 scripts/test_qgen.py
 scripts/test_qgen2.py
+
+# Benchmark data (noi dung phap luat)
+benchmark/*.json
+benchmark/*.jsonl
