@@ -37,3 +37,13 @@
 | TASK-011 | Kiểm thử E2E + eval dữ liệu thật | Đo Recall/MRR trên dữ liệu thật (dùng benchmark TASK-012), A/B chiều vector & α, tối ưu | Todo | 2026-07-04 |
 | TASK-013 | Dựng Typesense Dashboard (GUI quản trị) | Container `bfritscher/typesense-dashboard` chạy port 8888 (HTTP 200), kết nối server 8108. Xem/sửa/xóa document, chạy search. Sẽ đóng gói vào image sau. | Done | 2026-07-05 |
 | TASK-014 | API CRUD cập nhật dữ liệu | Module + CLI + REST admin (Starlette): upsert (re-embed, xử lý sub-chunk), patch hiệu lực (không re-embed), delete theo chunk_id/law_id, get. Đã test round-trip CLI + HTTP OK. | Done | 2026-07-05 |
+
+## Epic 3 — Main-stream Nghị định + đồ thị quan hệ (dữ liệu vbpl v260710, 105.975 VB)
+
+> Nguồn: `E:\vbpl\thuvienphapluat-v260710.jsonl` (cấp Văn bản, quan hệ trong `documentDiagrams`).
+> Quy tắc chốt: NĐ còn hiệu lực tính đến 19/7/2026 + tương lai · quan hệ hướng dẫn / được hướng dẫn / hợp nhất (2 chiều, dedup VBHN mới hơn) · mục tiêu cả đồ thị + search (embed ở phase sau).
+
+| ID | Tên task | Mô tả | Trạng thái | Ngày tạo |
+|----|----------|-------|-----------|----------|
+| TASK-015 | Trích main-stream NĐ + đồ thị quan hệ (Phase 1) | Lọc NĐ hiệu lực (gồm tương lai) → backbone; trích quan hệ hướng dẫn/được hướng dẫn/hợp nhất(2 chiều, dedup VBHN mới); xuất nodes + edges + tập văn bản main-stream (giữ nội dung cho phase sau) | In Progress | 2026-07-19 |
+| TASK-016 | Chunk + embed main-stream + search quan hệ (Phase 2) | Tách chunk các VB main-stream, embed, index Typesense; MCP tool tra quan hệ (get_related_documents) | Todo | 2026-07-19 |
