@@ -46,4 +46,13 @@
 | ID | Tên task | Mô tả | Trạng thái | Ngày tạo |
 |----|----------|-------|-----------|----------|
 | TASK-015 | Trích main-stream NĐ + đồ thị quan hệ (Phase 1) | XONG: 2.067 NĐ backbone + 4.094 edges (hướng dẫn/được hướng dẫn/hợp nhất, dedup 267 VBHN) + 4.371 văn bản main-stream (full nội dung). data/mainstream/. | Done | 2026-07-19 |
-| TASK-016 | Chunk + embed main-stream + search quan hệ (Phase 2) | Tách chunk các VB main-stream, embed, index Typesense; MCP tool tra quan hệ (get_related_documents) | Todo | 2026-07-19 |
+| TASK-016 | Chunk + embed main-stream + search quan hệ (Phase 2) | Tách chunk (126.254 điều), embed 8B/4096d, index `legal_mainstream`, search API (rollup parent_id, gộp full điều, doc-code routing). MCP: sửa field cho collection mới + thêm tool `get_related_documents`. OpenAPI spec. | In Progress | 2026-07-19 |
+
+## Epic 4 — Đóng gói & triển khai main-stream lên production
+
+> Bản cũ (`legal_articles`, 1024d) đang chạy production. Cần image slim mới (code main-stream + MCP đã sửa),
+> quy trình deploy chi tiết, và thao tác **clear corpus cũ** để chuyển sang `legal_mainstream` (4096d).
+
+| ID | Tên task | Mô tả | Trạng thái | Ngày tạo |
+|----|----------|-------|-----------|----------|
+| TASK-017 | Đóng gói image slim main-stream + triển khai + clear corpus cũ | Build image slim mới (default `legal_mainstream`/8B/4096, MCP đã sửa), viết DEPLOY.md quy trình migrate từ bản production cũ (drop collection `legal_articles`), import `embedded_chunks.jsonl` (126k điều, 4096d), snapshot. | Analyzing | 2026-07-19 |
