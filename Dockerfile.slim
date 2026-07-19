@@ -23,11 +23,11 @@ RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh && mkdir 
 # Cau hinh mac dinh (KHONG chua secret). EMBED_API_KEY truyen luc `docker run -e ...`.
 ENV TYPESENSE_HOST=localhost \
     TYPESENSE_PORT=8108 \
-    TYPESENSE_COLLECTION=legal_articles \
+    TYPESENSE_COLLECTION=legal_mainstream \
     TYPESENSE_API_KEY=poc_legal_search_2026 \
     EMBED_BASE_URL=https://proxy.cyberbot.vn/v1 \
-    EMBED_MODEL=Qwen3-Embedding-4B \
-    EMBED_DIM=1024 \
+    EMBED_MODEL=Qwen/Qwen3-Embedding-8B \
+    EMBED_DIM=4096 \
     EMBED_BATCH_SIZE=16 \
     RERANK_MODEL=Qwen/Qwen3-Reranker-4B \
     RERANK_ENABLE=true \

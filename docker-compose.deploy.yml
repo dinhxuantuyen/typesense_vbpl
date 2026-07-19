@@ -4,7 +4,7 @@ version: "3.8"
 
 services:
   legal-mcp:
-    image: ghcr.io/dinhxuantuyen/legal-mcp:slim
+    image: ghcr.io/dinhxuantuyen/legal-mcp:mainstream
     container_name: legal-mcp
     restart: unless-stopped
     ports:
