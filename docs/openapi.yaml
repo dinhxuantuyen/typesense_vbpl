@@ -9,9 +9,10 @@ info:
 
     **Kiến trúc hiện tại:**
     - Tìm kiếm phục vụ AI Agent qua **MCP (streamable HTTP)** tại `/mcp` (tool `search_legal_articles`,
-      `get_legal_article`, `collection_stats`, `get_related_documents`). Đặc tả REST dưới đây là hợp đồng
-      tương đương cho REST gateway.
-    - CRUD/admin phục vụ qua **REST** (Starlette) — đã triển khai trong `legal_search/admin_api.py`.
+      `get_legal_article`, `collection_stats`, `get_related_documents`).
+    - Tìm kiếm + CRUD/admin cũng phục vụ qua **REST** (Starlette) — đã triển khai trong
+      `legal_search/admin_api.py`. Search: `POST /v1/search` (alias `/search`) chạy đúng luồng hybrid
+      như MCP `search_legal_articles`.
 
     **Embedding:** Qwen3-Embedding-8B (4096 chiều). **Rerank:** Qwen3-Reranker-4B.
     **Đơn vị dữ liệu:** 1 bản ghi = 1 Điều (điều dài tách nhiều part, khi trả về gộp `full_content`).
